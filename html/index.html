@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Distortionz Food Delivery</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Active order card -->
+    <div id="orderCard" class="order-card hidden">
+        <div class="card-header">
+            <span class="status-tag">
+                <i class="dot"></i>
+                <span class="status-text">ACTIVE ORDER</span>
+            </span>
+            <span class="card-timer">0:00</span>
+        </div>
+
+        <div class="card-progress">
+            <div class="card-progress-fill"></div>
+        </div>
+
+        <div class="card-body">
+            <div class="info-row">
+                <span class="row-label">From</span>
+                <span class="row-value restaurant">—</span>
+            </div>
+            <div class="info-row">
+                <span class="row-label">Distance</span>
+                <span class="row-value distance">— m</span>
+            </div>
+            <div class="info-row">
+                <span class="row-label">Mode</span>
+                <span class="row-value mode">—</span>
+            </div>
+        </div>
+
+        <div class="card-items">
+            <div class="items-label">ITEMS</div>
+            <ul class="items-list" id="itemsList"></ul>
+        </div>
+    </div>
+
+    <!-- Rating popup (delivered → customer rating) -->
+    <div id="ratingOverlay" class="rating-overlay hidden">
+        <div class="rating-card">
+            <div class="rating-header">
+                <span class="delivered-tag">DELIVERED</span>
+                <span class="payout" id="ratingPayout">+$0</span>
+            </div>
+
+            <div class="quote" id="ratingQuote">"Great timing!"</div>
+
+            <div class="stars" id="ratingStars">
+                <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+            </div>
+
+            <div class="rating-meta">
+                <div class="meta-row">
+                    <span class="meta-label">Tier</span>
+                    <span class="meta-value tier-label" id="tierLabel">Standard</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Avg Rating</span>
+                    <span class="meta-value" id="avgRating">5.0★</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Total Deliveries</span>
+                    <span class="meta-value" id="totalDeliveries">0</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Time</span>
+                    <span class="meta-value" id="ratingTime">— / —</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

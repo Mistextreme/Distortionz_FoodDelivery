@@ -1,0 +1,326 @@
+/* ──────────────────────────────────────────────────────────────────
+   Distortionz Food Delivery — order + rating UI
+   Matte black, #c8c828 brand accents, no backdrop-filter (CEF safe).
+   ────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif;
+    color: #fff;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.hidden { display: none !important; }
+
+/* ─── Active order card (right side, vertically centered) ────────── */
+.order-card {
+    position: fixed;
+    top: 50%;
+    right: 24px;
+    transform: translateY(-50%);
+    width: 320px;
+    background: rgba(14, 14, 14, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    animation: cardSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.order-card.fading { animation: cardSlideOut 0.4s ease forwards; }
+
+@keyframes cardSlideIn {
+    from { transform: translateX(120%) translateY(-50%); opacity: 0; }
+    to   { transform: translateX(0)     translateY(-50%); opacity: 1; }
+}
+@keyframes cardSlideOut {
+    from { transform: translateX(0)     translateY(-50%); opacity: 1; }
+    to   { transform: translateX(120%) translateY(-50%); opacity: 0; }
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #c8c828;
+    font-size: 10.5px;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+}
+.status-tag .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #c8c828;
+    box-shadow: 0 0 6px rgba(200, 200, 40, 0.7);
+    animation: dotPulse 1.6s ease-in-out infinite;
+}
+@keyframes dotPulse {
+    0%, 100% { opacity: 1;   transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+.card-timer {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 13px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: -0.02em;
+}
+.card-timer.warn     { color: #ffc14a; }
+.card-timer.critical { color: #ff4a4a; }
+
+.card-progress {
+    height: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    width: 100%;
+}
+.card-progress-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #c8c828, #f0e26a);
+    transition: width 1s linear, background 0.3s ease;
+}
+.card-progress-fill.warn { background: linear-gradient(90deg, #ffc14a, #ffd76c); }
+.card-progress-fill.crit { background: linear-gradient(90deg, #ff4a4a, #ff7a6c); }
+
+.card-body {
+    padding: 11px 14px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.row-label {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.row-value {
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 12.5px;
+    font-weight: 700;
+    text-align: right;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-value.distance {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    color: #c8c828;
+    letter-spacing: -0.01em;
+}
+
+.row-value.mode {
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(200, 200, 40, 0.12);
+    color: #c8c828;
+    border: 1px solid rgba(200, 200, 40, 0.3);
+    max-width: none;
+}
+.row-value.mode.vehicle {
+    background: rgba(80, 160, 255, 0.16);
+    color: #5fa9ff;
+    border-color: rgba(80, 160, 255, 0.32);
+}
+
+.card-items {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 10px 14px 12px;
+}
+.items-label {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    margin-bottom: 6px;
+}
+.items-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.items-list li {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+}
+.items-list li:last-child { border-bottom: none; }
+
+/* ─── Rating overlay (centered) ──────────────────────────────────── */
+.rating-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    animation: fadeIn 0.3s ease both;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.rating-overlay.fading { animation: fadeOut 0.4s ease forwards; }
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+.rating-card {
+    width: 380px;
+    background: rgba(14, 14, 14, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+    padding: 20px 24px 22px;
+    animation: ratingPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes ratingPop {
+    from { transform: scale(0.85) translateY(20px); opacity: 0; }
+    to   { transform: scale(1)    translateY(0);    opacity: 1; }
+}
+
+.rating-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.delivered-tag {
+    color: #6cff9c;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+}
+
+.payout {
+    color: #c8c828;
+    font-size: 22px;
+    font-weight: 900;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    letter-spacing: -0.02em;
+}
+
+.quote {
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 14.5px;
+    font-style: italic;
+    font-weight: 500;
+    margin: 6px 0 16px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.stars {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 18px;
+}
+.stars .star {
+    font-size: 32px;
+    color: rgba(255, 255, 255, 0.18);
+    transition: color 0.3s ease, transform 0.3s ease;
+}
+.stars .star.filled {
+    color: #ffd76c;
+    text-shadow: 0 0 12px rgba(255, 215, 108, 0.55);
+    animation: starPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stars .star.half {
+    /* Half star using gradient */
+    background: linear-gradient(90deg, #ffd76c 50%, rgba(255, 255, 255, 0.18) 50%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+}
+
+@keyframes starPop {
+    from { transform: scale(0.4); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+.rating-meta {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.meta-label {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.meta-value {
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 12.5px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    letter-spacing: -0.02em;
+}
+
+.meta-value.tier-label {
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(200, 200, 40, 0.16);
+    color: #c8c828;
+    border: 1px solid rgba(200, 200, 40, 0.3);
+    font-family: 'Inter', sans-serif;
+    font-weight: 900;
+}
+
+/* Tier color variants */
+.tier-label[data-tier="Top Driver"] { background: rgba(40, 255, 131, 0.14); color: #6cff9c; border-color: rgba(40, 255, 131, 0.35); }
+.tier-label[data-tier="Trusted"]    { background: rgba(40, 255, 131, 0.10); color: #6cff9c; border-color: rgba(40, 255, 131, 0.28); }
+.tier-label[data-tier="Probation"]  { background: rgba(255, 193, 74, 0.14); color: #ffc14a; border-color: rgba(255, 193, 74, 0.35); }

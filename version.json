@@ -1,0 +1,6 @@
+{
+    "version": "1.0.5",
+    "name": "distortionz_fooddelivery",
+    "download": "https://github.com/Distortionzz/Distortionz_FoodDelivery",
+    "changelog": "v1.0.5 — Config.MenuItems, Config.Restaurants and Config.CustomerSpawns now ship EMPTY. Each section has a copy-paste-ready template comment directly above it showing the exact format, field-by-field rules, and a 2-entry example. Server boot banner now reflects whatever the user has filled in. README installation step 4 added covering the fill-in flow. No code behavior changed — purely a packaging change so installers get a clean canvas instead of having to delete sample data. v1.0.4 — Version checker fix + disconnect item exploit fix."
+}
