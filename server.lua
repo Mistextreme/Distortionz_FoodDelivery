@@ -1,11 +1,17 @@
 -- ╔══════════════════════════════════════════════════════════════════╗
--- ║ Distortionz Food Delivery — server                               ║
+-- ║ Distortionz Food Delivery — server (ESX-Legacy)                  ║
 -- ║                                                                  ║
 -- ║ Receives "start delivery" requests from a restaurant ped, picks  ║
 -- ║ a random customer location + menu items, gives the player the    ║
 -- ║ items, and tracks the active job. On hand-over, validates items  ║
 -- ║ are present, removes them, computes payout + tip + rating, pays  ║
 -- ║ the player, and writes the rating to MySQL.                      ║
+-- ║                                                                  ║
+-- ║ ESX-Legacy: ESX global provided by @es_extended/imports.lua.     ║
+-- ║ Player lookup: ESX.GetPlayerFromId(src)                          ║
+-- ║ Player identity: xPlayer.identifier                              ║
+-- ║ Payment (cash): xPlayer.addMoney(amount)                         ║
+-- ║ Payment (bank): xPlayer.addAccountMoney('bank', amount)          ║
 -- ╚══════════════════════════════════════════════════════════════════╝
 
 -- ─── State ──────────────────────────────────────────────────────────
@@ -21,22 +27,21 @@ local function Debug(...)
 end
 
 local function getPlayer(src)
-    local ok, p = pcall(function() return exports.qbx_core:GetPlayer(src) end)
-    if not ok then return nil end
-    return p
+    return ESX.GetPlayerFromId(src)
 end
 
-local function getCitizenId(src)
-    local p = getPlayer(src)
-    if not p or not p.PlayerData then return nil end
-    return p.PlayerData.citizenid
+-- Returns the ESX player identifier (e.g. "license:xxxxxxxx")
+local function getIdentifier(src)
+    local xPlayer = ESX.GetPlayerFromId(src)
+    if not xPlayer then return nil end
+    return xPlayer.identifier
 end
 
 local function notify(src, message, notifyType, duration, title)
     notifyType = notifyType or 'primary'
     duration   = duration or 5000
     title      = title or Config.Notify.title
-    -- Prefer custom notify
+    -- Prefer custom notify; falls back to ox_lib client-side
     if GetResourceState(Config.Notify.resource) == 'started' then
         TriggerClientEvent('distortionz_fooddelivery:client:notify', src, message, notifyType, duration, title)
         return
@@ -98,7 +103,7 @@ local function generateOrder(restaurantId)
 end
 
 -- ─── Compute payout for a delivered order ──────────────────────────
--- Returns: finalPay, tier, breakdown table
+-- Returns: finalPay, breakdown table
 local function computePayout(distanceM, elapsedSec, expectedSec, ratingTier)
     local base = Config.Payment.basePay or 80
     local distanceTip = math.floor(distanceM * (Config.Payment.perMeterTip or 0))
@@ -153,7 +158,7 @@ local function rollCustomerRating(elapsedSec, expectedSec, distance, tookVehicle
     if needsVehicle and not tookVehicle then
         base = base - 0.5    -- player walked when they should've driven
     elseif (not needsVehicle) and tookVehicle then
-        -- Driving for a short trip is fine, slight nudge down for being lazy
+        -- Driving for a short trip is fine; slight nudge down for being lazy
         base = base - 0.1
     end
 
@@ -231,10 +236,10 @@ end
 
 -- ─── lib.callback: fetch player rating summary ─────────────────────
 lib.callback.register('distortionz_fooddelivery:cb:getRating', function(src)
-    local citizenid = getCitizenId(src)
-    if not citizenid then return nil end
+    local identifier = getIdentifier(src)
+    if not identifier then return nil end
 
-    local avg, count = DB.GetRollingAverage(citizenid)
+    local avg, count = DB.GetRollingAverage(identifier)
     local tier = resolveTier(avg, count)
     return {
         average     = avg,
@@ -357,36 +362,35 @@ lib.callback.register('distortionz_fooddelivery:cb:deliverJob', function(src, pa
     local stars = rollCustomerRating(elapsedSec, expectedSec, job.distance, tookVehicle)
 
     -- Pull current rating tier (BEFORE this delivery is recorded)
-    local citizenid = getCitizenId(src)
-    if not citizenid then
-        return { ok = false, reason = 'Could not resolve player citizenid.' }
+    local identifier = getIdentifier(src)
+    if not identifier then
+        return { ok = false, reason = 'Could not resolve player identifier.' }
     end
-    local avg, count = DB.GetRollingAverage(citizenid)
+    local avg, count = DB.GetRollingAverage(identifier)
     local tier = resolveTier(avg, count)
 
     -- Compute payout
     local finalPay, breakdown = computePayout(job.distance, elapsedSec, expectedSec, tier)
 
-    -- Remove items + pay
+    -- Remove items from inventory
     removeOrderItems(src, job.items)
 
-    local player = getPlayer(src)
-    if player and player.Functions and player.Functions.AddMoney then
-        player.Functions.AddMoney(Config.Payment.payAccount or 'cash', finalPay, '[Food Delivery] Tip + base')
-    elseif player and player.PlayerData then
-        -- qbx_core export fallback
-        local ok = pcall(function()
-            exports.qbx_core:AddMoney(src, Config.Payment.payAccount or 'cash', finalPay, 'food-delivery-tip')
-        end)
-        if not ok then
-            Debug('AddMoney fallback failed for src', src)
+    -- ESX-Legacy payment — cash goes to addMoney(), bank goes to addAccountMoney()
+    local xPlayer = ESX.GetPlayerFromId(src)
+    if xPlayer then
+        if Config.Payment.payAccount == 'bank' then
+            xPlayer.addAccountMoney('bank', finalPay)
+        else
+            xPlayer.addMoney(finalPay)
         end
+    else
+        Debug('deliverJob: could not find xPlayer for src', src, '— payment skipped')
     end
 
     -- Persist rating
-    DB.AppendRating(citizenid, stars, Config.Rating.historyWindowSize or 50)
+    DB.AppendRating(identifier, stars, Config.Rating.historyWindowSize or 50)
 
-    -- Pick a quote
+    -- Pick a quote from the matching star bracket
     local starBracket = math.floor(stars + 0.5)
     if starBracket < 1 then starBracket = 1 end
     if starBracket > 5 then starBracket = 5 end
@@ -394,7 +398,7 @@ lib.callback.register('distortionz_fooddelivery:cb:deliverJob', function(src, pa
     local quote = pool[math.random(#pool)]
 
     -- Compute new tier post-rating
-    local newAvg, newCount = DB.GetRollingAverage(citizenid)
+    local newAvg, newCount = DB.GetRollingAverage(identifier)
     local newTier = resolveTier(newAvg, newCount)
 
     activeJobs[src] = nil
@@ -404,17 +408,17 @@ lib.callback.register('distortionz_fooddelivery:cb:deliverJob', function(src, pa
         src, stars, finalPay, elapsedSec, expectedSec, job.distance))
 
     return {
-        ok           = true,
-        stars        = stars,
-        quote        = quote,
-        payout       = finalPay,
-        breakdown    = breakdown,
-        tierLabel    = tier and tier.label or 'Standard',
-        newAverage   = newAvg,
+        ok            = true,
+        stars         = stars,
+        quote         = quote,
+        payout        = finalPay,
+        breakdown     = breakdown,
+        tierLabel     = tier and tier.label or 'Standard',
+        newAverage    = newAvg,
         newDeliveries = newCount,
-        newTierLabel = newTier and newTier.label or 'Standard',
-        elapsedSec   = elapsedSec,
-        expectedSec  = expectedSec,
+        newTierLabel  = newTier and newTier.label or 'Standard',
+        elapsedSec    = elapsedSec,
+        expectedSec   = expectedSec,
     }
 end)
 
