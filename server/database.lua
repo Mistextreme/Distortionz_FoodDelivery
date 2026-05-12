@@ -1,15 +1,20 @@
 -- ╔══════════════════════════════════════════════════════════════════╗
--- ║ Distortionz Food Delivery — database layer                       ║
+-- ║ Distortionz Food Delivery — database layer (ESX-Legacy)          ║
 -- ║ Schema bootstrap + rating CRUD via oxmysql.                      ║
+-- ║                                                                  ║
+-- ║ ESX-Legacy change: primary key column renamed from               ║
+-- ║ `citizenid` (QBCore) to `identifier` (ESX xPlayer.identifier).  ║
 -- ╚══════════════════════════════════════════════════════════════════╝
 
 DB = DB or {}
 
 -- ─── Schema bootstrap ──────────────────────────────────────────────
 -- Runs once on resource start. Idempotent — safe to run on every boot.
+-- NOTE: identifier uses VARCHAR(60) — ESX identifiers (license:xxx,
+-- steam:xxx) can exceed 50 chars used by QBCore citizenids.
 local SCHEMA = [[
 CREATE TABLE IF NOT EXISTS distortionz_fooddelivery_ratings (
-    citizenid VARCHAR(50) PRIMARY KEY,
+    identifier VARCHAR(60) PRIMARY KEY,
     total_deliveries INT NOT NULL DEFAULT 0,
     rating_sum DECIMAL(12, 2) NOT NULL DEFAULT 0,
     last_ratings JSON NOT NULL,
@@ -32,13 +37,13 @@ CreateThread(function()
     print('^2[distortionz_fooddelivery]^7 DB schema verified.')
 end)
 
--- ─── Get rating row for a citizenid (creates default if missing) ────
-function DB.GetRating(citizenid)
-    if not citizenid or citizenid == '' then return nil end
+-- ─── Get rating row for an identifier (creates default if missing) ──
+function DB.GetRating(identifier)
+    if not identifier or identifier == '' then return nil end
 
     local rows = MySQL.query.await(
-        'SELECT total_deliveries, rating_sum, last_ratings, last_delivery_at FROM distortionz_fooddelivery_ratings WHERE citizenid = ? LIMIT 1',
-        { citizenid }
+        'SELECT total_deliveries, rating_sum, last_ratings, last_delivery_at FROM distortionz_fooddelivery_ratings WHERE identifier = ? LIMIT 1',
+        { identifier }
     )
 
     if rows and rows[1] then
@@ -49,7 +54,7 @@ function DB.GetRating(citizenid)
             if ok and type(decoded) == 'table' then last = decoded end
         end
         return {
-            citizenid       = citizenid,
+            identifier      = identifier,
             totalDeliveries = tonumber(row.total_deliveries) or 0,
             ratingSum       = tonumber(row.rating_sum) or 0,
             lastRatings     = last,
@@ -59,7 +64,7 @@ function DB.GetRating(citizenid)
 
     -- No row yet — return empty default
     return {
-        citizenid       = citizenid,
+        identifier      = identifier,
         totalDeliveries = 0,
         ratingSum       = 0,
         lastRatings     = {},
@@ -69,10 +74,10 @@ end
 
 -- ─── Append a new rating to a player's history ──────────────────────
 -- starsRating = number 1.0–5.0, windowSize = max history entries
-function DB.AppendRating(citizenid, starsRating, windowSize)
-    if not citizenid or citizenid == '' then return false end
+function DB.AppendRating(identifier, starsRating, windowSize)
+    if not identifier or identifier == '' then return false end
 
-    local current = DB.GetRating(citizenid)
+    local current = DB.GetRating(identifier)
     if not current then return false end
 
     -- Append new rating
@@ -90,7 +95,7 @@ function DB.AppendRating(citizenid, starsRating, windowSize)
     -- Upsert
     MySQL.query.await([[
         INSERT INTO distortionz_fooddelivery_ratings
-            (citizenid, total_deliveries, rating_sum, last_ratings, last_delivery_at)
+            (identifier, total_deliveries, rating_sum, last_ratings, last_delivery_at)
         VALUES (?, ?, ?, ?, NOW())
         ON DUPLICATE KEY UPDATE
             total_deliveries = VALUES(total_deliveries),
@@ -98,7 +103,7 @@ function DB.AppendRating(citizenid, starsRating, windowSize)
             last_ratings     = VALUES(last_ratings),
             last_delivery_at = VALUES(last_delivery_at)
     ]], {
-        citizenid,
+        identifier,
         newTotal,
         newSum,
         json.encode(list),
@@ -109,8 +114,8 @@ end
 
 -- ─── Get the rolling average over the last N ratings ───────────────
 -- Returns: average (number), count (int)
-function DB.GetRollingAverage(citizenid)
-    local rec = DB.GetRating(citizenid)
+function DB.GetRollingAverage(identifier)
+    local rec = DB.GetRating(identifier)
     if not rec then return Config.Rating.defaultRating, 0 end
 
     local list = rec.lastRatings or {}
